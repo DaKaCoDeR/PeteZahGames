@@ -19,8 +19,9 @@ import process from 'process';
 import BetterSqlite3Session from 'better-sqlite3-session-store';
 
 import { ddosShield } from './security/ddos-shield.js';
-import { toIPv4, systemState, createGateMiddleware, createMemoryProtection, checkCircuitBreaker, checkSystemPressure, cleanupSecurityMaps, isTrustedWS, adjustPowDifficulty, updateIPReputation } from './middleware/security.js';
+import { toIPv4, systemState, createGateMiddleware, createMemoryProtection, checkCircuitBreaker, checkSystemPressure, cleanupSecurityMaps, isTrustedWS, adjustPowDifficulty } from './middleware/security.js';
 import { authLimiter, createApiLimiter, createAiLimiter, signupLimiter } from './middleware/rate-limit.js';
+import { updateIPReputation } from './middleware/security.js';
 import challengeRouter from './routes/challenge.js';
 import aiRouter from './routes/ai.js';
 import db from './db.js';
@@ -63,7 +64,12 @@ const aiLimiter = createAiLimiter(shield);
 
 app.use(cookieParser());
 app.use(compression({ level: 6, threshold: 1024 }));
-app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization'] }));
+app.use(cors({
+  origin: (origin, cb) => cb(null, origin || '*'),
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb', parameterLimit: 100 }));
 
@@ -91,8 +97,6 @@ app.use('/uploads/', express.static(path.join(__dirname, '../uploads')));
 
 app.get('/sw.js', (_req, res) => {
   res.setHeader('Content-Type', 'application/javascript');
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.setHeader('Service-Worker-Allowed', '/');
   res.sendFile(path.join(__dirname, '../dist/sw.js'));
 });
 
@@ -140,14 +144,6 @@ app.get('/api/admin/users-full', (req, res) => {
   if (!me || me.is_admin < 1) return res.status(403).json({ error: 'Forbidden' });
   const users = db.prepare('SELECT id, email, username, avatar_url, is_admin, email_verified, banned, created_at, ip FROM users ORDER BY created_at DESC').all();
   res.json({ users });
-});
-
-app.use((err, req, res, next) => {
-  if (err instanceof URIError) {
-    updateIPReputation(toIPv4(null, req), -10);
-    return res.status(400).send('Bad Request');
-  }
-  next(err);
 });
 
 const IS_DEV = process.env.NODE_ENV !== 'production';
