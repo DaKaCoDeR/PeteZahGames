@@ -26,8 +26,8 @@ const getEmbedUrl = (originalUrl: string, scramjet: any) => {
   try {
     const domain = new URL(originalUrl).hostname;
     if (domain.includes('google.com')) return '/static/google-embed.html#google.com';
-    if (domain.includes('youtube.com')) return '/static/youtube-embed.html#youtube.com';
-    if (domain.includes('reddit.com')) return '/static/reddit-embed.html#reddit.com';
+    if (domain.includes('youtube.com')) return '/static/google-embed.html#youtube.com';
+    if (domain.includes('reddit.com')) return '/static/google-embed.html#reddit.com';
   } catch { }
   return scramjet.encodeUrl(originalUrl);
 };
